@@ -105,7 +105,7 @@ claude plugin test ./mods/local-router
 | `hooks/signals.ts` | what is read from the engine: definition files, the policy file, the clock |
 | `hooks/outcomes.ts` | the decision store, outcome attachment, summaries and the `/router` text |
 | `hooks/register.ts` | the hooks: `agent.spawn`, `tool.call`, `turn.complete`, `session.start`, `/router` |
-| `tests/router.test.ts` | 28 cases against the engine's own test kit |
+| `tests/router.test.ts` | 29 cases against the engine's own test kit |
 
 The verb lists at the top of `policy.ts` are the knobs to tune.
 

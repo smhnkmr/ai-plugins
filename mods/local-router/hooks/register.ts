@@ -116,7 +116,15 @@ export const register: Register = (on, options) => {
   }).catch(($, e, next) => next(e))
 
   on('turn.complete', async ($, e, next) => {
-    const counters = e.agentId ? running.get(e.agentId) : undefined
+    // The counters live in module memory, which a hot reload empties. The
+    // store still knows which agents this router started and has not heard
+    // from, so a subagent that outlives a reload keeps its outcome, minus
+    // the tool counts the reload lost.
+    let counters = e.agentId ? running.get(e.agentId) : undefined
+    if (!counters && e.agentId && (await isPending($, e.agentId))) {
+      counters = freshCounters()
+      running.set(e.agentId, counters)
+    }
     if (counters && e.agentId) {
       counters.turns += 1
       if (e.usage) {
@@ -172,9 +180,23 @@ async function settle(
   if (started.deny === undefined) {
     const agentId = started.agentId
     await saveDecision($, agentId ? { ...decision, agentId } : decision)
-    if (agentId) running.set(agentId, { toolCalls: 0, toolErrors: 0, turns: 0, usage: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 } })
+    if (agentId) running.set(agentId, freshCounters())
   }
   return started
+}
+
+function freshCounters(): Counters {
+  return { toolCalls: 0, toolErrors: 0, turns: 0, usage: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 } }
+}
+
+/** True when the store holds a decision for `agentId` with no outcome yet. */
+async function isPending($: EngineInterface, agentId: string): Promise<boolean> {
+  const rows = await listDecisions($)
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    const row = rows[i]
+    if (row && row.agentId === agentId) return row.outcome === undefined
+  }
+  return false
 }
 
 function pick(value: unknown, fallback: string): string {

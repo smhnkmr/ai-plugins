@@ -277,6 +277,16 @@ test('a resumed subagent accumulates across its turns', async ($, on) => {
   expect(seen.stored[0]?.outcome).toMatchObject({ output: 1500, turns: 2 })
 })
 
+test('a pending decision in the store still gets its outcome after the counters are lost', async ($, on) => {
+  // As after a hot reload: the store has the row, module memory has nothing.
+  const seen = engine(on)
+  seen.stored = [
+    { at: 1, agent: 'general-purpose', description: 'Earlier research', tier: 'trivial', reason: 'verb "research"', asked: 'sonnet', picked: 'haiku', toolUseId: 't', mode: 'act', applied: true, respawn: false, agentId: 'agent-7' },
+  ]
+  await $.turn.complete(finished('agent-7', 'claude-haiku-5-5', 640))
+  expect(seen.stored[0]?.outcome).toMatchObject({ model: 'claude-haiku-5-5', output: 640, toolCalls: 0, turns: 1 })
+})
+
 test('a turn of an agent the router never saw is ignored', async ($, on) => {
   const seen = engine(on)
   await $.turn.complete(finished('agent-9', 'claude-opus-5-5'))
