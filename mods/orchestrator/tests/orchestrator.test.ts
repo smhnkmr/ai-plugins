@@ -175,6 +175,15 @@ test('named and generic spawns and main-loop turns are counted per session', asy
   expect(row.reports).toEqual([900])
 })
 
+test('a resumed session continues its record instead of overwriting it', async ($, on) => {
+  const seen = engine(on)
+  seen.stored = [{ id: 'session-1', startedAt: 1, named: 3, generic: 2, mainTurns: 7, mainOutput: 9000, reports: [400] }]
+  await $.session.start(start)
+  await $.agent.spawn(spawn('orchestrator:scout'))
+  expect(seen.stored).toHaveLength(1)
+  expect(seen.stored[0]).toMatchObject({ id: 'session-1', named: 4, generic: 2, mainTurns: 7, mainOutput: 9000, reports: [400] })
+})
+
 test('a spawn passes through unchanged', async ($, on) => {
   const seen = engine(on)
   await $.session.start(start)

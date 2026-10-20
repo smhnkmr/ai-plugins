@@ -78,4 +78,4 @@ claude plugin test ./mods/orchestrator
 | `hooks/section.ts` | the section text |
 | `hooks/policy.ts` | the `.claude/orchestrator.json` parser |
 | `hooks/register.ts` | the hooks: `session.start`, `prompt.compose`, `agent.spawn`, `turn.complete`, `/orchestrate` |
-| `tests/orchestrator.test.ts` | 11 cases against the engine's test kit |
+| `tests/orchestrator.test.ts` | 12 cases against the engine's test kit |

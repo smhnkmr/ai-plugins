@@ -159,6 +159,11 @@ async function startSession($: EngineInterface, state: State): Promise<void> {
   try {
     state.record.id = await $.session.id()
     state.record.startedAt = await $.clock.now()
+    // A resumed session, or a reload of this module, continues the record it
+    // already has rather than starting a new count under the same id.
+    const held = await $.store.get(SESSIONS_KEY)
+    const earlier = (Array.isArray(held) ? (held as SessionRecord[]) : []).find(row => row.id === state.record.id)
+    if (earlier) state.record = { ...earlier, reports: [...earlier.reports] }
   } catch {
     /* a session with no id is still orchestrated, just not recorded */
   }
