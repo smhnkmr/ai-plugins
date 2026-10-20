@@ -1,17 +1,18 @@
 {
   "name": "local-router",
-  "version": "0.1.0",
-  "description": "Routes each subagent to a model by task complexity, locally: heavy work to Opus, light checks to Sonnet, read-only research to Haiku. No network, no server.",
+  "version": "0.2.0",
+  "description": "Routes each subagent to a model by task complexity, locally: heavy work to Opus, light checks to Sonnet, read-only research to Haiku. Records what each subagent then cost. No network, no server.",
   "author": { "name": "smhnkmr" },
   "repository": "https://github.com/smhnkmr/ai-plugins",
   "license": "MIT",
   "keywords": ["mod", "router", "subagent", "model"],
   "userConfig": {
-    "enabled": {
-      "type": "boolean",
-      "title": "Routing enabled",
-      "description": "Turn off to let every spawn run exactly as Claude proposed.",
-      "default": true
+    "mode": {
+      "type": "string",
+      "title": "Mode",
+      "description": "act: route spawns. shadow: decide and record, change nothing. off: do nothing.",
+      "options": ["act", "shadow", "off"],
+      "default": "act"
     },
     "heavy_model": {
       "type": "string",
@@ -37,7 +38,7 @@
     "show_toasts": {
       "type": "boolean",
       "title": "Show a toast per routed spawn",
-      "description": "One line to you, never to the model, each time a spawn's model is changed.",
+      "description": "One line to you, never to the model, each time a spawn's model is changed or refused.",
       "default": true
     }
   }
