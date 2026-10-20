@@ -1,6 +1,6 @@
 {
   "name": "orchestrator",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Makes the main model an orchestrator: four named cheap agents to delegate to, and the facts it needs to decide what to delegate. A switch, no prompting required.",
   "author": { "name": "smhnkmr" },
   "repository": "https://github.com/smhnkmr/ai-plugins",

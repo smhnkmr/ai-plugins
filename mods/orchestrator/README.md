@@ -27,7 +27,9 @@ Each agent's own prompt ends with the report contract: findings first, file path
 
 And one section appended to the system prompt, built once per session:
 
-> **Delegation.** You are working on a subscription where the main model's context re-reads and output are the main cost, and subagents run on cheaper models. Four named agents are available as subagent types: orchestrator:scout (read-only search, Haiku), orchestrator:researcher (web lookups, Haiku), orchestrator:worker (a bounded change with tests, Sonnet), orchestrator:verifier (runs suites and browser flows, Sonnet). A subagent starts with no context and rebuilds what it needs; the main context grows only by its report. Reading a file into this context costs roughly forty times what a scout pays to read it, and the text then rides along in every later request; when work is mostly reading across independent files, scouts in parallel are usually the cheaper path. Use that to decide what to delegate and what to keep. Every report comes back findings first, with file paths, within 40 lines. Never spawn an agent to wait for another; end the turn and the notification will wake you.
+> **Delegation.** The main model's context re-reads and its output are the main cost of a session, and subagents run on cheaper models. Four named agents are available as subagent types: orchestrator:scout (read-only search, Haiku), orchestrator:researcher (web lookups, Haiku), orchestrator:worker (a bounded change with tests, Sonnet), orchestrator:verifier (runs suites and browser flows, Sonnet). A subagent starts with no context and rebuilds what it needs; the main context grows only by its report. Reading a file into this context costs roughly forty times what a scout pays to read it, and the text then rides along in every later request; when work is mostly reading across independent files, scouts in parallel are usually the cheaper path. Use that to decide what to delegate and what to keep. Every report comes back findings first, with file paths, within 40 lines. Never spawn an agent to wait for another; end the turn and the notification will wake you.
+
+That is the text for an Opus or Fable main model. The read-cost ratio follows the model of the session's first render: Sonnet is told twenty times, and a Haiku main model is told the cost per token is about the same and that delegation pays through parallel work and a short report. The section names only the agents that registered, and is withheld if none did, so the model is never pointed at a subagent type the engine does not have.
 
 Facts, not rules. The model lacks three things it cannot see from inside the conversation: which agents exist, what delegation costs, and what has worked before. The section gives the first two; a repo can add the third. Thresholds like "delegate above ten tool calls" are deliberately absent: they freeze a guess and age with every model release.
 
@@ -69,6 +71,8 @@ The two mods are independent. With both installed, the router respects the named
 
 ## Development
 
+Built and tested against Claude Code 2.1.302 to 2.1.304 on Windows 11, with Opus and Fable as the main model. The mods API is new; if a later build changes it, `claude plugin validate` says what.
+
 ```
 claude plugin validate ./mods/orchestrator
 claude plugin test ./mods/orchestrator
@@ -80,4 +84,4 @@ claude plugin test ./mods/orchestrator
 | `hooks/section.ts` | the section text |
 | `hooks/policy.ts` | the `.claude/orchestrator.json` parser |
 | `hooks/register.ts` | the hooks: `session.start`, `prompt.compose`, `agent.spawn`, `turn.complete`, `/orchestrate` |
-| `tests/orchestrator.test.ts` | 12 cases against the engine's test kit |
+| `tests/orchestrator.test.ts` | 16 cases against the engine's test kit |

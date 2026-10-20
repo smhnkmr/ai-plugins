@@ -74,15 +74,19 @@ export const register: Register = (on, options) => {
     // drawn as a warning with the plugin's name in front of it. Clear any
     // pin an earlier load of this plugin left behind.
     $.ui.status(undefined)
-    $.ui.toast(`orchestrator on · ${state.registered.length} agents registered · /orchestrate for details`)
+    $.ui.toast(
+      state.registered.length > 0
+        ? `orchestrator on · ${state.registered.length} agents registered · /orchestrate for details`
+        : 'orchestrator: no agents registered, delegation section withheld · /orchestrate for details',
+    )
     return next(e)
   })
 
   on('prompt.compose', async ($, e, next) => {
     const result = await next(e)
     if (!enabled) return result
-    const ours = await sectionFor($, state)
-    if (result.sections.some(s => s.id === ours.id)) return result
+    const ours = await sectionFor($, state, e.model)
+    if (!ours || result.sections.some(s => s.id === ours.id)) return result
     return { sections: [...result.sections, ours] }
   })
 
@@ -141,17 +145,26 @@ async function loadPolicy($: EngineInterface, state: State): Promise<Orchestrato
 }
 
 /** The section, built on first use and frozen: the same text on every render
- * of the session keeps the prefix cache intact. */
-async function sectionFor($: EngineInterface, state: State): Promise<PromptComposeSection> {
+ * of the session keeps the prefix cache intact. It names only the agents that
+ * registered, and is withheld when none did. The read-cost ratio comes from
+ * the model of the first render; a /model switch later in the session keeps
+ * it until the next session, the price of a stable prefix. */
+async function sectionFor($: EngineInterface, state: State, mainModel: string): Promise<PromptComposeSection | undefined> {
   if (state.section) return state.section
   const policy = await loadPolicy($, state)
-  const specs = agentSpecs(state.settings, policy)
-  state.section = {
-    id: SECTION_ID,
-    text: buildSection(specs, policy?.report_lines ?? state.settings.reportLines, policy?.facts),
-    scope: 'session',
-  }
+  const specs = agentSpecs(state.settings, policy).filter(spec => isRegistered(state, spec.name))
+  const text = buildSection(specs, policy?.report_lines ?? state.settings.reportLines, {
+    mainModel,
+    prefix: $.plugin.name,
+    ...(policy?.facts ? { facts: policy.facts } : {}),
+  })
+  if (!text) return undefined
+  state.section = { id: SECTION_ID, text, scope: 'session' }
   return state.section
+}
+
+function isRegistered(state: State, name: string): boolean {
+  return state.registered.some(full => full.endsWith(`:${name}`))
 }
 
 /** Registers the four agents and opens this session's record. */
@@ -186,7 +199,7 @@ function status(_$: EngineInterface, state: State): string {
     `orchestrator on · report cap ${cap} lines${state.policy ? ' · repo policy applied' : ''}`,
     ...specs.map(
       spec =>
-        `  ${spec.name.padEnd(11)} ${spec.model.padEnd(8)} ${state.registered.some(name => name.endsWith(`:${spec.name}`)) ? 'registered' : 'not registered'}`,
+        `  ${spec.name.padEnd(11)} ${spec.model.padEnd(8)} ${isRegistered(state, spec.name) ? 'registered' : 'not registered'}`,
     ),
     `  this session: ${record.named} named spawns, ${record.generic} generic, ${record.mainTurns} main-loop turns, ${record.mainOutput.toLocaleString()} main-loop output tokens, median report ${median(record.reports)} chars`,
   ].join('\n')

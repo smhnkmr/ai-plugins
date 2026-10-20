@@ -43,3 +43,7 @@ claude plugin test ./mods/local-router
 ```
 
 An interactive session watches a `--plugin-dir` folder and reloads the mod when a file is saved.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
