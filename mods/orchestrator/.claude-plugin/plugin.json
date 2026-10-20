@@ -1,0 +1,39 @@
+{
+  "name": "orchestrator",
+  "version": "0.1.0",
+  "description": "Makes the main model an orchestrator: four named cheap agents to delegate to, and the facts it needs to decide what to delegate. A switch, no prompting required.",
+  "author": { "name": "smhnkmr" },
+  "repository": "https://github.com/smhnkmr/ai-plugins",
+  "license": "MIT",
+  "keywords": ["mod", "orchestrator", "subagent", "delegation"],
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Orchestrator enabled",
+      "description": "Register the named agents and add the delegation section to the system prompt. Off restores the default behaviour.",
+      "default": true
+    },
+    "worker_model": {
+      "type": "string",
+      "title": "Worker model",
+      "description": "Model for the worker agent: a bounded change with tests.",
+      "options": ["sonnet", "opus"],
+      "default": "sonnet"
+    },
+    "verifier_model": {
+      "type": "string",
+      "title": "Verifier model",
+      "description": "Model for the verifier agent: runs suites and browser flows.",
+      "options": ["sonnet", "opus"],
+      "default": "sonnet"
+    },
+    "report_lines": {
+      "type": "number",
+      "title": "Report length",
+      "description": "The line cap every agent is told to report within.",
+      "default": 40,
+      "min": 10,
+      "max": 200
+    }
+  }
+}

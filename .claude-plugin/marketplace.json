@@ -7,6 +7,11 @@
       "name": "local-router",
       "source": "./mods/local-router",
       "description": "Routes each Claude Code subagent to a model by task complexity, locally. Heavy work to Opus, light checks to Sonnet, read-only research to Haiku."
+    },
+    {
+      "name": "orchestrator",
+      "source": "./mods/orchestrator",
+      "description": "Makes the main model an orchestrator: four named cheap agents to delegate to, and the facts it needs to decide what to delegate. A switch, no prompting required."
     }
   ]
 }

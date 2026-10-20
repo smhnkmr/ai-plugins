@@ -22,7 +22,10 @@ Answer `y` to add the marketplace, then pick a scope. In the Desktop app, where 
 
 | Name | What it does |
 | --- | --- |
-| [local-router](mods/local-router) | Picks each subagent's model by task complexity, on your machine. Heavy work to Opus, light checks to Sonnet, read-only research to Haiku. No network. |
+| [local-router](mods/local-router) | Picks each subagent's model by task complexity, on your machine. Heavy work to Opus, light checks to Sonnet, read-only research to Haiku. Records what each subagent cost. No network. |
+| [orchestrator](mods/orchestrator) | Makes the main model an orchestrator: four named cheap agents (scout, researcher, worker, verifier) and a system-prompt section with the economics of delegation. A switch in `/config`. No network. |
+
+The two are independent and work together: the router respects the orchestrator's pinned agent models and routes the main model's generic spawns.
 
 ## Develop
 
