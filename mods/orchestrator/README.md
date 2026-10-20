@@ -27,7 +27,7 @@ Each agent's own prompt ends with the report contract: findings first, file path
 
 And one section appended to the system prompt, built once per session:
 
-> **Delegation.** You are working on a subscription where the main model's context re-reads and output are the main cost, and subagents run on cheaper models. Four named agents are available as subagent types: orchestrator:scout (read-only search, Haiku), orchestrator:researcher (web lookups, Haiku), orchestrator:worker (a bounded change with tests, Sonnet), orchestrator:verifier (runs suites and browser flows, Sonnet). A subagent starts with no context and rebuilds what it needs; the main context grows only by its report. Use that to decide what to delegate and what to keep. Every report comes back findings first, with file paths, within 40 lines. Never spawn an agent to wait for another; end the turn and the notification will wake you.
+> **Delegation.** You are working on a subscription where the main model's context re-reads and output are the main cost, and subagents run on cheaper models. Four named agents are available as subagent types: orchestrator:scout (read-only search, Haiku), orchestrator:researcher (web lookups, Haiku), orchestrator:worker (a bounded change with tests, Sonnet), orchestrator:verifier (runs suites and browser flows, Sonnet). A subagent starts with no context and rebuilds what it needs; the main context grows only by its report. Reading a file into this context costs roughly forty times what a scout pays to read it, and the text then rides along in every later request; when work is mostly reading across independent files, scouts in parallel are usually the cheaper path. Use that to decide what to delegate and what to keep. Every report comes back findings first, with file paths, within 40 lines. Never spawn an agent to wait for another; end the turn and the notification will wake you.
 
 Facts, not rules. The model lacks three things it cannot see from inside the conversation: which agents exist, what delegation costs, and what has worked before. The section gives the first two; a repo can add the third. Thresholds like "delegate above ten tool calls" are deliberately absent: they freeze a guess and age with every model release.
 
@@ -60,6 +60,8 @@ A repo can override with `.claude/orchestrator.json` at its root:
 `/orchestrate` prints the mode, the four agents with their models and whether each registered, and this session's counts: named spawns, generic spawns, main-loop turns, main-loop output tokens, median report length. `/orchestrate on` and `/orchestrate off` flip the switch. A toast at session start says it is on and how many agents registered.
 
 Two numbers say whether orchestration is helping: the share of named spawns, and main-loop output per turn. Both are kept per session in the plugin's store, last 100 sessions. If the model over-delegates, add a fact about cold-start cost; if it under-delegates, add one about what a long run costs inline. Tune with facts, not rules.
+
+Measured on a 314-file Angular app with Opus as the main model: a mechanical survey (which services each component injects) was scripted inline in 11 Bash calls, no spawn, and that is the cheapest path for it. A survey that needs code read for meaning (a plain-English summary per feature folder) went to seven parallel scouts, with the main loop doing the grep itself; its own context traffic was a quarter of the scripted run's.
 
 ## With local-router
 
