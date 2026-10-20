@@ -1,0 +1,12 @@
+{
+  "name": "ai-plugins",
+  "owner": { "name": "smhnkmr" },
+  "description": "Claude Code plugins and mods by smhnkmr: model routing and other harness tooling.",
+  "plugins": [
+    {
+      "name": "local-router",
+      "source": "./mods/local-router",
+      "description": "Routes each Claude Code subagent to a model by task complexity, locally. Heavy work to Opus, light checks to Sonnet, read-only research to Haiku."
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "name": "local-router",
+  "version": "0.1.0",
+  "description": "Routes each subagent to a model by task complexity, locally: heavy work to Opus, light checks to Sonnet, read-only research to Haiku. No network, no server.",
+  "author": { "name": "smhnkmr" },
+  "repository": "https://github.com/smhnkmr/ai-plugins",
+  "license": "MIT",
+  "keywords": ["mod", "router", "subagent", "model"],
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Routing enabled",
+      "description": "Turn off to let every spawn run exactly as Claude proposed.",
+      "default": true
+    },
+    "heavy_model": {
+      "type": "string",
+      "title": "Heavy tasks",
+      "description": "Model for build, implement, fix, refactor, design, review and plan tasks.",
+      "options": ["opus", "fable", "sonnet"],
+      "default": "opus"
+    },
+    "light_model": {
+      "type": "string",
+      "title": "Light tasks",
+      "description": "Model for validate, verify, compare, summarize and test-writing tasks.",
+      "options": ["sonnet", "haiku", "opus"],
+      "default": "sonnet"
+    },
+    "trivial_model": {
+      "type": "string",
+      "title": "Trivial tasks",
+      "description": "Model for research, search, find and other read-only work.",
+      "options": ["haiku", "sonnet"],
+      "default": "haiku"
+    },
+    "show_toasts": {
+      "type": "boolean",
+      "title": "Show a toast per routed spawn",
+      "description": "One line to you, never to the model, each time a spawn's model is changed.",
+      "default": true
+    }
+  }
+}

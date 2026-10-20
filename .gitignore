@@ -1,0 +1,7 @@
+# Laid beside a mod by the engine on every load; regenerated, never edited.
+**/.claude-plugin/types/
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+*.log
+node_modules/
