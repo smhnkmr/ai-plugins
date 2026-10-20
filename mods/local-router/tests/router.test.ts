@@ -351,3 +351,138 @@ test('policy: same-task detection and outcome summaries', async () => {
   ]
   expect(summarize(rows)).toEqual([{ tier: 'heavy', model: 'opus', n: 2, medianToolCalls: 30, errorRate: 1, medianOutput: 300, respawnRate: 0.5 }])
 })
+
+// ---------------------------------------------------------------- session tagger
+
+import type { PromptSubmitInput, TurnStepInput } from 'claude-code'
+
+import { CORRECTION, classifySession, formatSessions, freshSession, isSubstantive } from '../hooks/session'
+import type { SessionRecord } from '../hooks/session'
+
+/** The engine beneath the tagger: a session id, a prompt that enters, a
+ * step that answers, and the same in-memory store as `engine`. */
+function sessionEngine(on: On) {
+  const seen = engine(on)
+  on('session.id', () => ({ value: 'session-1' }))
+  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  on('prompt.submit', (_$, e) => ({ text: e.text }))
+  on('turn.step', async function* (_$, e) {
+    return { turnId: e.turnId, index: e.index, answer: 'ok', toolUses: [], stopReason: 'end_turn', usage: { model: e.model, input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } }
+  })
+  return seen
+}
+
+function typed(text: string): PromptSubmitInput {
+  return { text, wait: false, origin: { kind: 'composer' } }
+}
+
+function step(model: string, index = 0): TurnStepInput {
+  return { turnId: 'turn-1', index, model, effort: 'high', messageCount: 2 }
+}
+
+function mainTurn(output: number): TurnCompleteInput {
+  const { agentId: _agentId, ...rest } = finished('x', 'claude-opus-5-5', output)
+  return rest
+}
+
+const start = { cwd: 'C:/repo', surface: 'terminal' as const, isInteractive: true }
+
+function sessions(seen: { stored: unknown[] }): SessionRecord[] {
+  return seen.stored as unknown as SessionRecord[]
+}
+
+test('the first substantive prompt tags the session and the first step records the model', async ($, on) => {
+  const seen = sessionEngine(on)
+  await $.session.start(start)
+  await $.prompt.submit(typed('/router stats'))
+  await $.prompt.submit(typed('ok'))
+  await $.prompt.submit(typed('Rename the booking date field in src/app/teesheet/teesheet.component.ts to playDate.'))
+  for await (const _chunk of $.turn.step(step('claude-opus-5-5'))) {
+    /* drain */
+  }
+  await $.turn.complete(mainTurn(800))
+  const [row] = sessions(seen)
+  expect(sessions(seen)).toHaveLength(1)
+  expect(row).toMatchObject({ id: 'session-1', isInteractive: true, wouldRun: 'sonnet', actualModel: 'claude-opus-5-5', actualEffort: 'high', mainSteps: 1, mainTurns: 1, mainOutput: 800, prompts: 1 })
+  expect(row?.tag).toMatchObject({ kind: 'bounded', tier: 'light' })
+  expect(row?.tag?.prompt).toContain('Rename the booking date field')
+})
+
+test('later prompts count escalation and pushback without retagging', async ($, on) => {
+  const seen = sessionEngine(on)
+  await $.session.start(start)
+  await $.prompt.submit(typed('Where is the cart total computed?'))
+  await $.prompt.submit(typed('Now implement a discount line under it and debug why the tax is wrong.'))
+  await $.prompt.submit(typed("No, that's wrong, the tax applies before the discount."))
+  const [row] = sessions(seen)
+  expect(row?.tag?.kind).toBe('lookup')
+  expect(row).toMatchObject({ prompts: 3, laterHeavy: 1, corrections: 1 })
+})
+
+test('spawns are counted on the session even when routing is off', { options: { mode: 'off' } }, async ($, on) => {
+  const seen = sessionEngine(on)
+  await $.session.start(start)
+  await $.prompt.submit(typed('Explain how the router picks a model for a spawn.'))
+  await $.agent.spawn(input(research))
+  await $.turn.complete(mainTurn(100))
+  expect(sessions(seen).find(row => row.id === 'session-1')).toMatchObject({ spawns: 1, mainTurns: 1 })
+})
+
+test('a resumed session continues its record', async ($, on) => {
+  const seen = sessionEngine(on)
+  seen.stored = [{ ...freshSession('session-1', 1, true), tag: { kind: 'heavy', tier: 'inherit', reason: 'judgement verbs', prompt: 'Debug it' }, wouldRun: '', prompts: 4, spawns: 2 }] as unknown as Decision[]
+  await $.session.start(start)
+  await $.prompt.submit(typed('Also check the other branch of the same function.'))
+  const [row] = sessions(seen)
+  expect(sessions(seen)).toHaveLength(1)
+  expect(row).toMatchObject({ prompts: 5, spawns: 2 })
+  expect(row?.tag?.kind).toBe('heavy')
+})
+
+test('the tagger never rewrites the model and can be switched off', { options: { session_tagger: 'off' } }, async ($, on) => {
+  const seen = sessionEngine(on)
+  await $.session.start(start)
+  await $.prompt.submit(typed('What does the teesheet component do?'))
+  let model = ''
+  for await (const _chunk of $.turn.step(step('claude-opus-5-5'))) {
+    /* drain */
+  }
+  model = 'unchanged'
+  expect(model).toBe('unchanged')
+  expect(sessions(seen)).toHaveLength(0)
+})
+
+test('/router session prints this session and the comparison', async ($, on) => {
+  const seen = sessionEngine(on)
+  await $.session.start(start)
+  await $.prompt.submit(typed('Which files touch the booking date?'))
+  for await (const _chunk of $.turn.step(step('claude-opus-5-5'))) {
+    /* drain */
+  }
+  const { text } = await $.command.run({ command: 'router', args: 'session', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } })
+  expect(text).toContain('shadow')
+  expect(text).toContain('this session: lookup (a question) · would run sonnet · ran opus at high')
+  expect(text).toContain('lookup → sonnet')
+  expect(seen.stored.length).toBeGreaterThan(0)
+})
+
+test('pure: session classification', async () => {
+  expect(isSubstantive('ok')).toBe(false)
+  expect(isSubstantive('continue')).toBe(false)
+  expect(isSubstantive('/router stats')).toBe(false)
+  expect(isSubstantive('Why does the build fail on Windows?')).toBe(true)
+  expect(classifySession('Why does the build fail on Windows?', true)).toMatchObject({ kind: 'heavy', tier: 'inherit' })
+  expect(classifySession('Implement the quick-order PIN dialog.', true)).toMatchObject({ kind: 'heavy', tier: 'inherit' })
+  expect(classifySession('Review the PR for the teesheet refactor.', true)).toMatchObject({ kind: 'heavy', tier: 'inherit' })
+  expect(classifySession('Where is the cart total computed?', true)).toMatchObject({ kind: 'lookup', tier: 'light' })
+  expect(classifySession('Where is the cart total computed?', false)).toMatchObject({ kind: 'lookup', tier: 'trivial' })
+  expect(classifySession('Summarize what src/app/pages does.', false)).toMatchObject({ kind: 'lookup', tier: 'trivial' })
+  expect(classifySession('Add a `maxPlayers` field to booking.model.ts and bump the schema version.', true)).toMatchObject({ kind: 'bounded', tier: 'light' })
+  expect(classifySession('Add a field for max players.', true)).toMatchObject({ kind: 'ambiguous', tier: 'inherit' })
+  expect(classifySession('Let us talk about the roadmap for next quarter.', true)).toMatchObject({ kind: 'ambiguous', tier: 'inherit' })
+  expect(CORRECTION.test("No, that's wrong.")).toBe(true)
+  expect(CORRECTION.test('Revert the last change.')).toBe(true)
+  expect(CORRECTION.test('Now add the tests.')).toBe(false)
+  const lines = formatSessions(freshSession('s', 0, true), [])
+  expect(lines[0]).toContain('not tagged yet')
+})

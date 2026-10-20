@@ -76,6 +76,21 @@ A repo can override the defaults with `.claude/router.json` at its root. Every f
 
 `agents` maps an agent type to a tier and beats the built-in types. `models` maps a tier to a model and beats the `/config` values. `verbs` adds whole words or phrases to a tier's list. Precedence overall: frontmatter model, then this file, then `/config`, then the built-in table. A missing or malformed file is ignored.
 
+### Session tagger (shadow)
+
+The main model's own cost is mostly re-reads of its context, and the prompt cache is per model, so the only free moment to pick the main model is before its first call. The tagger reads the first substantive prompt of a session and records what kind of session it opens and which tier the main model would need:
+
+| First prompt | Kind | Would run |
+| --- | --- | --- |
+| implement, build, debug, why does X fail, design, review, refactor, plan | heavy | your model, unchanged |
+| a question: where, which, how, explain, summarize, or ends in `?` | lookup | the light model; the trivial model under `claude -p` |
+| one change with a file or symbol named: add, rename, update, remove, wire | bounded | the light model |
+| anything else | ambiguous | your model, unchanged |
+
+It then records what the session actually did: the model and effort of the first main-loop request, main-loop turns and output tokens, spawns, later prompts that read as heavier work (the tag was too low), and later prompts that read as pushback ("no, that's wrong", "revert"). Nothing is rewritten. A toast at the first prompt says what the pick would have been.
+
+`/router session` prints this session's line and, for every tagged session on this machine, grouped by what the pick would have run: how often the session outgrew its tag, how often you pushed back, spawns and main-loop output per session, and what it actually ran. When the lookup and bounded groups show pushback and escalation rates no worse than the heavy group over a week or two, the pick is safe to apply with a one-way escalation; until then it stays a record. Slash commands, acknowledgements and prompts the engine injects are not tagged.
+
 ## Configuration
 
 Each field is a row in `/config`:
@@ -86,6 +101,7 @@ Each field is a row in `/config`:
 | Heavy tasks | opus | opus, fable or sonnet |
 | Light tasks | sonnet | sonnet, haiku or opus |
 | Trivial tasks | haiku | haiku or sonnet |
+| Session tagger | shadow | shadow or off; see above |
 | Show a toast per routed spawn | on | the one-line notice |
 
 ## Failure is silence
@@ -102,13 +118,14 @@ claude plugin test ./mods/local-router
 | File | Holds |
 | --- | --- |
 | `hooks/policy.ts` | the rules, as plain functions: verb lists, tiers, placeholder test, frontmatter and policy-file parsers, same-task test |
+| `hooks/session.ts` | the session tagger: classifier, record, `/router session` text |
 | `hooks/signals.ts` | what is read from the engine: definition files, the policy file, the clock |
 | `hooks/outcomes.ts` | the decision store, outcome attachment, summaries and the `/router` text |
 | `hooks/register.ts` | the hooks: `agent.spawn`, `tool.call`, `turn.complete`, `session.start`, `/router` |
-| `tests/router.test.ts` | 30 cases against the engine's own test kit |
+| `tests/router.test.ts` | 37 cases against the engine's own test kit |
 
 The verb lists at the top of `policy.ts` are the knobs to tune.
 
 ## Roadmap
 
-Next: a per-agent call counter with a warning and a prompt cap for long browser runs, then rate-limit aware tiers, then effort reduction on notification-driven main-loop turns behind shadow mode, then a step-up rule driven by the outcome stats.
+Next: the browser up-route becomes a log tag until the comparison it rests on is made like for like; a per-agent call counter with a warning and a prompt cap for long browser runs; rate-limit aware tiers; the session tagger applied, one-way escalation only, once its shadow record says the lookup and bounded picks are safe; a step-up rule driven by the outcome stats.

@@ -1,6 +1,6 @@
 {
   "name": "local-router",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Routes each subagent to a model by task complexity, locally: heavy work to Opus, light checks to Sonnet, read-only research to Haiku. Records what each subagent then cost. No network, no server.",
   "author": { "name": "smhnkmr" },
   "repository": "https://github.com/smhnkmr/ai-plugins",
@@ -34,6 +34,13 @@
       "description": "Model for research, search, find and other read-only work.",
       "options": ["haiku", "sonnet"],
       "default": "haiku"
+    },
+    "session_tagger": {
+      "type": "string",
+      "title": "Session tagger",
+      "description": "shadow: tag each session from its first prompt with the main-loop tier it would need, record what it then ran, never change it. off: do not tag. Read with /router session.",
+      "options": ["shadow", "off"],
+      "default": "shadow"
     },
     "show_toasts": {
       "type": "boolean",

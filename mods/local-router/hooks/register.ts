@@ -11,6 +11,11 @@
 // Two more hooks close the loop: `tool.call` counts a routed subagent's tool
 // calls and errors while it runs, and `turn.complete` attaches what it cost.
 //
+// A fourth group is the session tagger, shadow only: `prompt.submit` tags the
+// session from its first substantive prompt, `turn.step` notes which model the
+// main loop actually ran, and the spawn and turn hooks count what the session
+// did. `/router session` compares. See session.ts.
+//
 // Nothing leaves the machine. `claude plugin validate` lists every call this
 // module makes; there is no http.fetch among them.
 
@@ -20,6 +25,8 @@ import { attachOutcome, formatRecent, formatStats, listDecisions, saveDecision }
 import type { Decision, Mode, Outcome } from './outcomes'
 import { PLACEHOLDER_DENY, classify, describesSameTask, isPlaceholder, sameFamily } from './policy'
 import type { RoutedTier } from './policy'
+import { CORRECTION, HEAVY_SESSION, classifySession, formatSessions, freshSession, isSubstantive, listSessions, saveSession } from './session'
+import type { SessionRecord } from './session'
 import { now, readDefinition, readProjectPolicy } from './signals'
 
 type Models = Record<RoutedTier, string>
@@ -43,20 +50,69 @@ export const register: Register = (on, options) => {
   // Subagents this session routed and is still accounting for.
   const running = new Map<string, Counters>()
 
+  // The session tagger's record: one per session, continued across a reload
+  // or a resume from the store. Shadow only; nothing reads it but /router.
+  const tagging = options.session_tagger !== 'off'
+  let session: SessionRecord = freshSession('', 0, true)
+
   on('session.start', async ($, e, next) => {
     try {
       await $.command.register({
         name: 'router',
-        description: 'Local model router: status, recent decisions, stats; on, off or shadow',
-        argumentHint: '[stats|on|off|shadow]',
+        description: 'Local model router: status, recent decisions, stats, session tag; on, off or shadow',
+        argumentHint: '[stats|session|on|off|shadow]',
       })
     } catch {
       /* the command is a convenience; routing works without it */
     }
+    if (tagging) {
+      try {
+        const id = await $.session.id()
+        const earlier = (await listSessions($)).find(row => row.id === id)
+        session = earlier ?? freshSession(id, await now($), e.isInteractive)
+      } catch {
+        /* a session with no id is routed as before, just not tagged */
+      }
+    }
     return next(e)
   })
 
+  // The first substantive prompt tags the session; every later one is read
+  // for the two signals that say the tag was wrong: heavier work, or pushback.
+  on('prompt.submit', async ($, e, next) => {
+    if (!tagging || !session.id || e.command || e.isMeta || !isSubstantive(e.text)) return next(e)
+    session.prompts += 1
+    if (!session.tag) {
+      session.tag = classifySession(e.text, session.isInteractive)
+      session.wouldRun = session.tag.tier === 'inherit' ? '' : defaults[session.tag.tier]
+      const line = `router (shadow) · session: ${session.tag.kind} · ${session.wouldRun ? `would run ${session.wouldRun}` : 'keeps your model'} · ${session.tag.reason}`
+      if (toasts) $.ui.toast(line)
+      $.ui.log(line, { to: 'debug' })
+    } else {
+      if (HEAVY_SESSION.test(e.text.slice(0, 600))) session.laterHeavy += 1
+      if (CORRECTION.test(e.text.trim())) session.corrections += 1
+    }
+    await saveSession($, session)
+    return next(e)
+  }).catch(($, e, next) => next(e))
+
+  // Observe only: which model and effort the main loop's requests go out
+  // with. The first one is the session's; it is the number the tag is
+  // compared against.
+  on('turn.step', async function* ($, e, next) {
+    if (tagging && session.id && e.agentId === undefined) {
+      session.mainSteps += 1
+      if (!session.actualModel) {
+        session.actualModel = e.model
+        if (e.effort !== undefined) session.actualEffort = String(e.effort)
+        await saveSession($, session)
+      }
+    }
+    return yield* next(e)
+  })
+
   on('agent.spawn', async ($, e, next) => {
+    if (tagging && session.id) session.spawns += 1
     if (mode === 'off' || e.fork || e.subagentType === 'fork') return next(e)
 
     const at = await now($)
@@ -123,6 +179,12 @@ export const register: Register = (on, options) => {
   }).catch(($, e, next) => next(e))
 
   on('turn.complete', async ($, e, next) => {
+    if (tagging && session.id && e.agentId === undefined) {
+      session.mainTurns += 1
+      session.mainOutput += e.usage?.output_tokens ?? 0
+      await saveSession($, session)
+      return next(e)
+    }
     // The counters live in module memory, which a hot reload empties. The
     // store still knows which agents this router started and has not heard
     // from, so a subagent that outlives a reload keeps its outcome, minus
@@ -164,6 +226,11 @@ export const register: Register = (on, options) => {
       } catch (error) {
         return { text: `router: could not switch to ${value}: ${String(error)}. Use /config instead.` }
       }
+    }
+
+    if (arg === 'session') {
+      if (!tagging) return { text: 'router: session tagger off' }
+      return { text: ['router session tagger (shadow): the pick is recorded, never applied', ...formatSessions(session, await listSessions($))].join('\n') }
     }
 
     const rows = await listDecisions($)
