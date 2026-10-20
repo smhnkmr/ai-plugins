@@ -57,7 +57,7 @@ A repo can override with `.claude/orchestrator.json` at its root:
 
 ## Seeing what it does
 
-`/orchestrate` prints the mode, the four agents with their models and whether each registered, and this session's counts: named spawns, generic spawns, main-loop turns, main-loop output tokens, median report length. `/orchestrate on` and `/orchestrate off` flip the switch. The status line shows `orchestrator` while it is on.
+`/orchestrate` prints the mode, the four agents with their models and whether each registered, and this session's counts: named spawns, generic spawns, main-loop turns, main-loop output tokens, median report length. `/orchestrate on` and `/orchestrate off` flip the switch. A toast at session start says it is on and how many agents registered.
 
 Two numbers say whether orchestration is helping: the share of named spawns, and main-loop output per turn. Both are kept per session in the plugin's store, last 100 sessions. If the model over-delegates, add a fact about cold-start cost; if it under-delegates, add one about what a long run costs inline. Tune with facts, not rules.
 

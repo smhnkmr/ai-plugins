@@ -70,7 +70,9 @@ export const register: Register = (on, options) => {
     }
     if (!enabled) return next(e)
     await startSession($, state)
-    $.ui.status('orchestrator')
+    // One line, once: a pinned status would sit under the prompt all session,
+    // drawn as a warning with the plugin's name in front of it.
+    $.ui.toast(`orchestrator on · ${state.registered.length} agents registered · /orchestrate for details`)
     return next(e)
   })
 
