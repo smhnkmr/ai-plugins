@@ -143,6 +143,19 @@ test('a model declared in the agent definition is left alone', async ($, on) => 
   expect(seen.last?.model).toBe('opus')
 })
 
+test("a plugin's registered agent is never rerouted", async ($, on) => {
+  const seen = engine(on)
+  await $.agent.spawn(
+    input({
+      prompt: 'Verify the booking flow end to end with Playwright and report failures.',
+      description: 'Verify booking flow',
+      subagentType: 'orchestrator:verifier',
+    }),
+  )
+  expect(seen.last?.model).toBeUndefined()
+  expect(seen.stored[0]).toMatchObject({ tier: 'inherit', reason: 'plugin agent', applied: false })
+})
+
 test('a read-only tool allowlist makes the agent trivial', async ($, on) => {
   const seen = engine(on)
   on('fs.read', (_$, e) =>

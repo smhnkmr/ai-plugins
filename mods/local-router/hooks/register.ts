@@ -78,6 +78,13 @@ export const register: Register = (on, options) => {
       await saveDecision($, { ...base, tier: 'deny', reason: 'placeholder spawn', picked: '', applied: false })
     }
 
+    // A plugin's registered agent (`orchestrator:verifier`) has no file to
+    // read and carries its model in its own definition: a human's choice,
+    // made once. It is never rerouted.
+    if (e.subagentType.includes(':')) {
+      return settle($, next, e, { ...base, tier: 'inherit', reason: 'plugin agent', picked: asked, applied: false }, running)
+    }
+
     const policy = await readProjectPolicy($)
     const definition = await readDefinition($, e.subagentType)
     if (definition?.model) {

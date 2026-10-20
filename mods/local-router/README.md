@@ -30,7 +30,7 @@ On every `agent.spawn` the mod decides a tier and rewrites the spawn's `model`:
 
 | Tier | Signal | Default model |
 | --- | --- | --- |
-| pinned | the agent definition's frontmatter declares `model:` | unchanged |
+| pinned | the agent definition's frontmatter declares `model:`, or the agent is a plugin's registered one (`orchestrator:verifier`), whose definition carries its model | unchanged |
 | deny | a placeholder spawn: a prompt under 50 characters whose description says noop, wait, placeholder, cancel or idle | refused, with a sentence telling the model to use the Monitor tool or a timer instead |
 | project | the repo's `.claude/router.json` names a tier for this agent type | per the file |
 | trivial | agent type `Explore` or `claude-code-guide`; a tool allowlist of read and search tools only; verbs like research, search, find, list, fetch | `haiku` |
@@ -105,7 +105,7 @@ claude plugin test ./mods/local-router
 | `hooks/signals.ts` | what is read from the engine: definition files, the policy file, the clock |
 | `hooks/outcomes.ts` | the decision store, outcome attachment, summaries and the `/router` text |
 | `hooks/register.ts` | the hooks: `agent.spawn`, `tool.call`, `turn.complete`, `session.start`, `/router` |
-| `tests/router.test.ts` | 29 cases against the engine's own test kit |
+| `tests/router.test.ts` | 30 cases against the engine's own test kit |
 
 The verb lists at the top of `policy.ts` are the knobs to tune.
 
